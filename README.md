@@ -13,5 +13,5 @@ A powerful and intuitive Habit Tracker application built with React, TypeScript,
 
 ## Demo
 
-Check out the live demo of the Habit Tracker at [my-Habits](https://bad-habits-tracker.netlify.app//).
+Check out the live demo of the Habit Tracker at [my-Habits](https://bad-habits-tracker.netlify.app/).
  
