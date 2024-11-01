@@ -2,16 +2,6 @@
 
 A powerful and intuitive Habit Tracker application built with React, TypeScript, and Vuetify. This app helps users manage their habits effectively by providing an easy-to-use interface for adding, tracking, and resetting habits, along with localization support for multiple languages.
 
-## Table of Contents
-
-- [Features](#features)
-- [Demo](#demo)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Technologies Used](#technologies-used)
-- [Contributing](#contributing)
-- [License](#license)
-
 ## Features
 
 - **Add New Habits**: Easily create and track new habits.
