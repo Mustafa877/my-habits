@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Languages, Moon, Sun, RotateCcw } from "lucide-react"
+import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,22 +17,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
   id: number
   name: string
-  daysWithout: number
+  daysCount: number
+  isHealthy: boolean
+  lastCongratulated?: number
 }
 
 type Language = "en" | "ar"
 type Theme = "light" | "dark"
+type Filter = "all" | "healthy" | "unhealthy"
 
 const translations = {
   en: {
-    title: "Bad Habits Tracker",
+    title: "Habit Tracker",
     addHabit: "Add Habit",
     enterHabit: "Enter a new habit",
     daysWithout: "Days without:",
+    daysStreak: "Days streak:",
     increaseDays: "Increase Days",
     habitAdded: "Habit added successfully!",
     habitRemoved: "Habit removed.",
@@ -50,12 +57,20 @@ const translations = {
     reset: "Reset All",
     resetConfirmTitle: "Reset All Habits",
     resetConfirmDescription: "This will delete all your habits. Are you sure you want to continue?",
+    healthyHabit: "Healthy habit",
+    filterAll: "All Habits",
+    filterHealthy: "Healthy Habits",
+    filterUnhealthy: "Unhealthy Habits",
+    noHealthyHabits: "No healthy habits added yet. Start by adding a new healthy habit!",
+    noUnhealthyHabits: "No unhealthy habits added yet. Start by adding a new unhealthy habit!",
+    congratulations: "Congratulations! You've maintained this habit for a month!",
   },
   ar: {
-    title: "متتبع العادات السيئة",
+    title: "متتبع العادات",
     addHabit: "إضافة العادة",
     enterHabit: "أدخل العادة جديدة",
     daysWithout: "الأيام بدون ممارسة:",
+    daysStreak: "أيام متتالية:",
     increaseDays: "زيادة الأيام",
     habitAdded: "تمت إضافة العادة بنجاح",
     habitRemoved: "تمت إزالة العادة",
@@ -73,6 +88,13 @@ const translations = {
     reset: "إعادة تعيين الكل",
     resetConfirmTitle: "إعادة تعيين جميع العادات",
     resetConfirmDescription: "سيؤدي هذا إلى حذف جميع عاداتك. هل أنت متأكد أنك تريد المتابعة؟",
+    healthyHabit: "عادة صحية",
+    filterAll: "جميع العادات",
+    filterHealthy: "العادات الصحية",
+    filterUnhealthy: "العادات غير الصحية",
+    noHealthyHabits: "لم تتم إضافة عادات صحية بعد. ابدأ بإضافة عادة صحية جديدة!",
+    noUnhealthyHabits: "لم تتم إضافة عادات غير صحية بعد. ابدأ بإضافة عادة غير صحية جديدة!",
+    congratulations: "تهانينا! لقد حافظت على هذه العادة لمدة شهر!",
   },
 }
 
@@ -83,12 +105,14 @@ const TOAST_LIMIT = 2
 export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [newHabit, setNewHabit] = useState("")
+  const [isHealthy, setIsHealthy] = useState(false)
   const [lang, setLang] = useState<Language>("en")
   const [theme, setTheme] = useState<Theme>("light")
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [habitToDelete, setHabitToDelete] = useState<number | null>(null)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [filter, setFilter] = useState<Filter>("all")
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -153,12 +177,13 @@ export function HabitTracker() {
       return
     }
     if (newHabit.trim() !== "") {
-      const habit = { id: Date.now(), name: newHabit, daysWithout: 0 }
+      const habit = { id: Date.now(), name: newHabit, daysCount: 0, isHealthy }
       const updatedHabits = [...habits, habit]
       setHabits(updatedHabits)
       localStorage.setItem("habits", JSON.stringify(updatedHabits))
       toast.success(t.habitAdded, { duration: 2000 })
       setNewHabit("")
+      setIsHealthy(false)
     } else {
       toast.error(t.enterHabitError, { duration: 2000 })
     }
@@ -192,9 +217,26 @@ export function HabitTracker() {
   }
 
   const incrementDays = (id: number) => {
-    const updatedHabits = habits.map((habit) =>
-      habit.id === id ? { ...habit, daysWithout: habit.daysWithout + 1 } : habit
-    )
+    const updatedHabits = habits.map((habit) => {
+      if (habit.id === id) {
+        const newDaysCount = habit.daysCount + 1
+        const shouldCongratulate = newDaysCount === 30 && (!habit.lastCongratulated || Date.now() - habit.lastCongratulated > 30 * 24 * 60 * 60 * 1000)
+        
+        if (shouldCongratulate) {
+          toast.success(t.congratulations, {
+            duration: 5000,
+            icon: '🎉',
+          })
+        }
+
+        return {
+          ...habit,
+          daysCount: newDaysCount,
+          lastCongratulated: shouldCongratulate ? Date.now() : habit.lastCongratulated,
+        }
+      }
+      return habit
+    })
     setHabits(updatedHabits)
     localStorage.setItem("habits", JSON.stringify(updatedHabits))
   }
@@ -215,8 +257,15 @@ export function HabitTracker() {
     })
   }
 
-  const totalPages = Math.max(1, Math.ceil(habits.length / ITEMS_PER_PAGE))
-  const displayedHabits = habits.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+  const filteredHabits = habits.filter((habit) => {
+    if (filter === "all") return true;
+    if (filter === "healthy") return habit.isHealthy;
+    if (filter === "unhealthy") return !habit.isHealthy;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredHabits.length / ITEMS_PER_PAGE));
+  const displayedHabits = filteredHabits.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   const handlePreviousPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
@@ -251,31 +300,58 @@ export function HabitTracker() {
             </Button>
           </div>
         </div>
-        <div className="flex mb-6">
-          <Input
-            type="text"
-            placeholder={t.enterHabit}
-            value={newHabit}
-            onChange={(e) => setNewHabit(e.target.value)}
-            className={`${
-              lang === "ar" ? "ml-2" : "mr-2"
-            } flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300`}
-            aria-label={t.enterHabit}
-            maxLength={50}
-          />
-          <Button onClick={addHabit} aria-label={t.addHabit}>
-            <Plus className={lang === "ar" ? "ml-2" : "mr-2"} />
-            {t.addHabit}
-          </Button>
+        <div className="flex flex-col mb-6 space-y-4">
+          <div className="flex">
+            <Input
+              type="text"
+              placeholder={t.enterHabit}
+              value={newHabit}
+              onChange={(e) => setNewHabit(e.target.value)}
+              className={`${
+                lang === "ar" ? "ml-2" : "mr-2"
+              
+              } flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300`}
+              aria-label={t.enterHabit}
+              maxLength={50}
+            />
+            <Button onClick={addHabit} aria-label={t.addHabit}>
+              <Plus className={lang === "ar" ? "ml-2" : "mr-2"} />
+              {t.addHabit}
+            </Button>
+          </div>
+          <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 p-2 rounded-md">
+            <Switch
+              id="healthy-habit"
+              checked={isHealthy}
+              onCheckedChange={setIsHealthy}
+              className="data-[state=checked]:bg-green-500"
+            />
+            <Label htmlFor="healthy-habit" className="text-sm font-medium">
+              {t.healthyHabit}
+            </Label>
+          </div>
+          <Select value={filter} onValueChange={(value: Filter) => setFilter(value)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={t.filterAll} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t.filterAll}</SelectItem>
+              <SelectItem value="healthy">{t.filterHealthy}</SelectItem>
+              <SelectItem value="unhealthy">{t.filterUnhealthy}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        {habits.length === 0 ? (
-          <p className="text-center text-gray-500 dark:text-gray-400 transition-colors duration-300">{t.noHabits}</p>
+        {filteredHabits.length === 0 ? (
+          <p className="text-center text-gray-500 dark:text-gray-400 transition-colors duration-300">
+            {filter === "all" ? t.noHabits : filter === "healthy" ? t.noHealthyHabits : t.noUnhealthyHabits}
+          </p>
         ) : (
           <div className="space-y-4">
             {displayedHabits.map((habit) => (
               <Card key={habit.id} className="shadow-md border rounded-lg transition-colors duration-300">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-2 border-b">
-                  <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-300">
+                  <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-300 flex items-center">
+                    {habit.isHealthy && <Heart className="mr-2 h-4 w-4 text-green-500" />}
                     {habit.name}
                   </CardTitle>
                   <Button
@@ -290,19 +366,28 @@ export function HabitTracker() {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center mb-4">
                     <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
-                      {t.daysWithout} {habit.daysWithout}
+                      {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
                     </span>
                     <Button onClick={() => incrementDays(habit.id)} aria-label={`Increase days for ${habit.name}`}>
                       {t.increaseDays}
                     </Button>
                   </div>
-                  <Progress value={(habit.daysWithout / 30) * 100} className="w-full" />
+                  <Progress 
+                    value={(habit.daysCount / 30) * 100} 
+                    className={`w-full ${habit.isHealthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
+                  />
+                  {habit.daysCount >= 30 && (
+                    <div className="mt-2 flex items-center text-green-500">
+                      <Check className="mr-2 h-4 w-4" />
+                      <span className="text-sm font-medium">{t.congratulations}</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
-        {habits.length > ITEMS_PER_PAGE && (
+        {filteredHabits.length > ITEMS_PER_PAGE && (
           <div className="flex justify-between mt-4">
             <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
               {t.previous}
@@ -315,33 +400,45 @@ export function HabitTracker() {
         {habits.length > 0 && (
           <div className="mt-6 text-center">
             <Button onClick={resetAllHabits} variant="outline" className="w-full">
-              <RotateCcw className="mr-2 h-4 w-4"   />
+              <RotateCcw className="mr-2 h-4 w-4" />
               {t.reset}
             </Button>
           </div>
         )}
       </div>
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t.deleteConfirmTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{t.deleteConfirmDescription}</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl font-bold">{t.deleteConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-600 dark:text-gray-300">
+              {t.deleteConfirmDescription}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>{t.confirm}</AlertDialogAction>
+            <AlertDialogCancel className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
+              {t.cancel}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-500 text-white hover:bg-red-600">
+              {t.confirm}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t.resetConfirmTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{t.resetConfirmDescription}</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl font-bold">{t.resetConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-600 dark:text-gray-300">
+              {t.resetConfirmDescription}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReset}>{t.confirm}</AlertDialogAction>
+            <AlertDialogCancel className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
+              {t.cancel}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReset} className="bg-red-500 text-white hover:bg-red-600">
+              {t.confirm}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

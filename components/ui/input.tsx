@@ -3,11 +3,11 @@ import { cn } from "@/lib/utils"
 
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
-  type?: React.InputHTMLAttributes<HTMLInputElement>["type"];  
+  type?: React.InputHTMLAttributes<HTMLInputElement>["type"]; // Optional type prop
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type = "text", ...props }, ref) => {  
+  ({ className, type = "text", ...props }, ref) => { // Default type set to "text"
     return (
       <input
         type={type}
