@@ -167,17 +167,16 @@ const MAX_HABITS = 10
 const TOAST_LIMIT = 2
 const REMINDER_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-const sendNotification = (message: string) => {
-  if ("Notification" in window) {
-    Notification.requestPermission().then((permission) => {
-      if (permission === "granted") {
-        new Notification("Habit Tracker", {
-          body: message,
-          icon: "/favicon.ico" // Make sure you have a favicon.ico in your public folder
-        });
-      }
-    });
+const checkAndSetReminder = () => {
+  const lastReminderTime = localStorage.getItem('lastReminderTime');
+  const currentTime = Date.now();
+  
+  if (!lastReminderTime || currentTime - parseInt(lastReminderTime) >= REMINDER_INTERVAL) {
+    localStorage.setItem('lastReminderTime', currentTime.toString());
+    return true;
   }
+  
+  return false;
 };
 
 export function HabitTracker() {
@@ -220,6 +219,19 @@ export function HabitTracker() {
       }
     }
 
+    const storedRemindersEnabled = localStorage.getItem("remindersEnabled")
+    if (storedRemindersEnabled) {
+      setRemindersEnabled(storedRemindersEnabled === "true")
+    }
+
+    // Check for reminder when app is opened
+    if (remindersEnabled && checkAndSetReminder()) {
+      toast.success(t.reminderMessage, {
+        icon: '⏰',
+        duration: 5000,
+      });
+    }
+
     // Load Arabic font
     const link = document.createElement("link")
     link.href = "https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700&display=swap"
@@ -255,7 +267,12 @@ export function HabitTracker() {
 
     if (remindersEnabled) {
       intervalId = setInterval(() => {
-        sendNotification(t.reminderMessage);
+        if (checkAndSetReminder()) {
+          toast.success(t.reminderMessage, {
+            icon: '⏰',
+            duration: 5000,
+          });
+        }
       }, REMINDER_INTERVAL);
     }
 
@@ -273,9 +290,9 @@ export function HabitTracker() {
     }
     if (newHabit.trim() !== "") {
       const habit = { 
-        id: Date.now(), 
-        name: newHabit, 
-        daysCount: 0, 
+        id: Date.now(),
+        name: newHabit,
+        daysCount: 0,
         isHealthy,
         lastCongratulated: {
           week: 0,
@@ -287,7 +304,7 @@ export function HabitTracker() {
       const updatedHabits = [...habits, habit]
       setHabits(updatedHabits)
       localStorage.setItem("habits", JSON.stringify(updatedHabits))
-      toast.success(t.habitAdded, { 
+      toast.success(t.habitAdded, {
         duration: 2000,
         icon: '🎉',
       })
@@ -403,10 +420,11 @@ export function HabitTracker() {
   }
 
   const toggleReminders = () => {
-    if (!remindersEnabled && "Notification" in window) {
-      Notification.requestPermission();
-    }
-    setRemindersEnabled((prev) => !prev);
+    setRemindersEnabled((prev) => {
+      const newValue = !prev;
+      localStorage.setItem("remindersEnabled", newValue.toString());
+      return newValue;
+    });
     toast.success(remindersEnabled ? t.disableReminders : t.enableReminders, {
       icon: remindersEnabled ? '🔕' : '🔔',
       duration: 2000,
@@ -442,9 +460,9 @@ export function HabitTracker() {
           },
         }}
       />
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-8 w-full max-w-2xl transition-colors duration-300 relative">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-center w-full text-gray-900 dark:text-white transition-colors duration-300">
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 sm:p-8 w-full max-w-2xl transition-colors duration-300 relative">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-center w-full sm:w-auto text-gray-900 dark:text-white transition-colors duration-300 mb-4 sm:mb-0">
             {t.title}
           </h1>
           <div className={`flex ${lang === "ar" ? "space-x-reverse space-x-2" : "space-x-2"}`}>
@@ -460,22 +478,19 @@ export function HabitTracker() {
           </div>
         </div>
 
-
         <div className="flex flex-col mb-6 space-y-4">
-          <div className="flex">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
             <Input
               type="text"
               placeholder={t.enterHabit}
               value={newHabit}
               onChange={(e) => setNewHabit(e.target.value)}
-              className={`${
-                lang === "ar" ? "ml-2" : "mr-2"
-              } flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300`}
+              className="flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300"
               aria-label={t.enterHabit}
               maxLength={50}
             />
-            <Button onClick={addHabit} aria-label={t.addHabit}>
-              <Plus className={lang === "ar" ? "ml-2" : "mr-2"} />
+            <Button onClick={addHabit} aria-label={t.addHabit} className="w-full sm:w-auto">
+              <Plus className="mr-2" />
               {t.addHabit}
             </Button>
           </div>
@@ -516,7 +531,7 @@ export function HabitTracker() {
           <div className="space-y-4">
             {displayedHabits.map((habit) => (
               <Card key={habit.id} className="shadow-md border rounded-lg transition-colors duration-300">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-2 border-b">
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 px-4 py-2 border-b">
                   <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-300 flex items-center">
                     {habit.isHealthy && <Heart className="mr-2 h-4 w-4 text-green-500" />}
                     {habit.name}
@@ -531,7 +546,7 @@ export function HabitTracker() {
                   </Button>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-2 sm:space-y-0">
                     <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
                       {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
                     </span>
