@@ -167,17 +167,7 @@ const MAX_HABITS = 10
 const TOAST_LIMIT = 2
 const REMINDER_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-const checkAndSetReminder = () => {
-  const lastReminderTime = localStorage.getItem('lastReminderTime');
-  const currentTime = Date.now();
-  
-  if (!lastReminderTime || currentTime - parseInt(lastReminderTime) >= REMINDER_INTERVAL) {
-    localStorage.setItem('lastReminderTime', currentTime.toString());
-    return true;
-  }
-  
-  return false;
-};
+ 
 
 export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
@@ -191,6 +181,7 @@ export function HabitTracker() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [remindersEnabled, setRemindersEnabled] = useState(false)
+  const [lastReminderTime, setLastReminderTime] = useState<number>(0);
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -219,17 +210,9 @@ export function HabitTracker() {
       }
     }
 
-    const storedRemindersEnabled = localStorage.getItem("remindersEnabled")
-    if (storedRemindersEnabled) {
-      setRemindersEnabled(storedRemindersEnabled === "true")
-    }
-
-    // Check for reminder when app is opened
-    if (remindersEnabled && checkAndSetReminder()) {
-      toast.success(t.reminderMessage, {
-        icon: '⏰',
-        duration: 5000,
-      });
+    const storedLastReminderTime = localStorage.getItem("lastReminderTime");
+    if (storedLastReminderTime) {
+      setLastReminderTime(parseInt(storedLastReminderTime, 10));
     }
 
     // Load Arabic font
@@ -263,25 +246,32 @@ export function HabitTracker() {
   }, [toasts])
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-
-    if (remindersEnabled) {
-      intervalId = setInterval(() => {
-        if (checkAndSetReminder()) {
-          toast.success(t.reminderMessage, {
-            icon: '⏰',
-            duration: 5000,
-          });
-        }
-      }, REMINDER_INTERVAL);
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+    const checkAndShowReminder = () => {
+      const now = Date.now();
+      if (remindersEnabled && now - lastReminderTime >= REMINDER_INTERVAL) {
+        showReminderNotification();
+        setLastReminderTime(now);
+        localStorage.setItem("lastReminderTime", now.toString());
       }
     };
-  }, [remindersEnabled, t.reminderMessage]);
+
+    const intervalId = setInterval(checkAndShowReminder, 60000); // Check every minute
+
+    return () => clearInterval(intervalId);
+  }, [remindersEnabled, lastReminderTime, t.reminderMessage]);
+
+  const showReminderNotification = () => {
+    toast.success(t.reminderMessage, {
+      icon: '⏰',
+      duration: 5000,
+    });
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Habit Tracker", {
+        body: t.reminderMessage,
+        icon: "/favicon.ico"
+      });
+    }
+  };
 
   const addHabit = () => {
     if (habits.length >= MAX_HABITS) {
@@ -420,15 +410,23 @@ export function HabitTracker() {
   }
 
   const toggleReminders = () => {
-    setRemindersEnabled((prev) => {
-      const newValue = !prev;
-      localStorage.setItem("remindersEnabled", newValue.toString());
-      return newValue;
-    });
-    toast.success(remindersEnabled ? t.disableReminders : t.enableReminders, {
-      icon: remindersEnabled ? '🔕' : '🔔',
-      duration: 2000,
-    });
+    if (!remindersEnabled && "Notification" in window) {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          setRemindersEnabled(true);
+          toast.success(t.enableReminders, {
+            icon: '🔔',
+            duration: 2000,
+          });
+        }
+      });
+    } else {
+      setRemindersEnabled((prev) => !prev);
+      toast.success(remindersEnabled ? t.disableReminders : t.enableReminders, {
+        icon: remindersEnabled ? '🔕' : '🔔',
+        duration: 2000,
+      });
+    }
   };
 
   const filteredHabits = habits.filter((habit) => {
