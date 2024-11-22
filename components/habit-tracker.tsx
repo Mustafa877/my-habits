@@ -74,6 +74,7 @@ const translations = {
     daysWithout: "Days without:",
     daysStreak: "Days streak:",
     increaseDays: "Increase Days",
+    decreaseDays: "Decrease Days",
     habitAdded: "Habit added successfully!",
     habitRemoved: "Habit removed.",
     enterHabitError: "Please enter a habit before adding",
@@ -117,6 +118,7 @@ const translations = {
     daysWithout: "الأيام بدون ممارسة:",
     daysStreak: "أيام متتالية:",
     increaseDays: "زيادة الأيام",
+    decreaseDays: "تقليل الأيام",
     habitAdded: "تمت إضافة العادة بنجاح",
     habitRemoved: "تمت إزالة العادة",
     enterHabitError: "يرجى إدخال العادة قبل الإضافة",
@@ -326,6 +328,20 @@ export function HabitTracker() {
     localStorage.setItem("habits", JSON.stringify(updatedHabits))
   }
 
+  const decrementDays = (id: number) => {
+    const updatedHabits = habits.map((habit) => {
+      if (habit.id === id && habit.daysCount > 0) {
+        return {
+          ...habit,
+          daysCount: habit.daysCount - 1,
+        }
+      }
+      return habit
+    })
+    setHabits(updatedHabits)
+    localStorage.setItem("habits", JSON.stringify(updatedHabits))
+  }
+
   const toggleLanguage = () => {
     setLang((prevLang) => {
       const newLang = prevLang === "en" ? "ar" : "en"
@@ -469,9 +485,14 @@ export function HabitTracker() {
                     <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
                       {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
                     </span>
-                    <Button onClick={() => incrementDays(habit.id)} aria-label={`Increase days for ${habit.name}`}>
-                      {t.increaseDays}
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button onClick={() => decrementDays(habit.id)} aria-label={`Decrease days for ${habit.name}`} variant="outline" size="sm">
+                        {t.decreaseDays}
+                      </Button>
+                      <Button onClick={() => incrementDays(habit.id)} aria-label={`Increase days for ${habit.name}`} size="sm">
+                        {t.increaseDays}
+                      </Button>
+                    </div>
                   </div>
                   <Progress 
                     value={(habit.daysCount / 30) * 100} 
