@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Trash2, Languages, RotateCcw, Heart, Lightbulb } from "lucide-react"
+import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check, Lightbulb, Bell, BellOff } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,7 +20,6 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { PlusIcon, MoonIcon, SunIcon, CheckIcon } from "@radix-ui/react-icons"
 
 interface Habit {
   id: number
@@ -110,6 +109,9 @@ const translations = {
     getTip: "Get a Tip",
     tipTitle: "Habit Tip",
     habitTips: habitTips.en,
+    enableReminders: "Enable Reminders",
+    disableReminders: "Disable Reminders",
+    reminderMessage: "Time to check on your habits!",
   },
   ar: {
     title: "متتبع العادات",
@@ -154,12 +156,29 @@ const translations = {
     getTip: "احصل على نصيحة",
     tipTitle: "نصيحة للعادات",
     habitTips: habitTips.ar,
+    enableReminders: "تفعيل التذكيرات",
+    disableReminders: "إيقاف التذكيرات",
+    reminderMessage: "حان الوقت للتحقق من عاداتك!",
   },
 }
 
 const ITEMS_PER_PAGE = 3
 const MAX_HABITS = 10
 const TOAST_LIMIT = 2
+const REMINDER_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+const sendNotification = (message: string) => {
+  if ("Notification" in window) {
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        new Notification("Habit Tracker", {
+          body: message,
+          icon: "/favicon.ico" // Make sure you have a favicon.ico in your public folder
+        });
+      }
+    });
+  }
+};
 
 export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
@@ -172,6 +191,7 @@ export function HabitTracker() {
   const [habitToDelete, setHabitToDelete] = useState<number | null>(null)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
+  const [remindersEnabled, setRemindersEnabled] = useState(false)
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -229,6 +249,22 @@ export function HabitTracker() {
       .filter((_, i) => i >= TOAST_LIMIT)
       .forEach((t) => toast.dismiss(t.id))
   }, [toasts])
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (remindersEnabled) {
+      intervalId = setInterval(() => {
+        sendNotification(t.reminderMessage);
+      }, REMINDER_INTERVAL);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [remindersEnabled, t.reminderMessage]);
 
   const addHabit = () => {
     if (habits.length >= MAX_HABITS) {
@@ -366,6 +402,17 @@ export function HabitTracker() {
     })
   }
 
+  const toggleReminders = () => {
+    if (!remindersEnabled && "Notification" in window) {
+      Notification.requestPermission();
+    }
+    setRemindersEnabled((prev) => !prev);
+    toast.success(remindersEnabled ? t.disableReminders : t.enableReminders, {
+      icon: remindersEnabled ? '🔕' : '🔔',
+      duration: 2000,
+    });
+  };
+
   const filteredHabits = habits.filter((habit) => {
     if (filter === "all") return true;
     if (filter === "healthy") return habit.isHealthy;
@@ -405,7 +452,10 @@ export function HabitTracker() {
               <Languages className="h-5 w-5" />
             </Button>
             <Button onClick={toggleTheme} variant="outline" size="icon" aria-label={t.toggleTheme}>
-              {theme === "light" ? <MoonIcon className="h-5 w-5" /> : <SunIcon className="h-5 w-5" />}
+              {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+            </Button>
+            <Button onClick={toggleReminders} variant="outline" size="icon" aria-label={remindersEnabled ? t.disableReminders : t.enableReminders}>
+              {remindersEnabled ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
             </Button>
           </div>
         </div>
@@ -425,7 +475,7 @@ export function HabitTracker() {
               maxLength={50}
             />
             <Button onClick={addHabit} aria-label={t.addHabit}>
-              <PlusIcon className={lang === "ar" ? "ml-2" : "mr-2"} />
+              <Plus className={lang === "ar" ? "ml-2" : "mr-2"} />
               {t.addHabit}
             </Button>
           </div>
@@ -438,7 +488,7 @@ export function HabitTracker() {
             />
             <Label htmlFor="healthy-habit" className="text-sm font-medium flex items-center">
               {isHealthy && lang === "ar" ? (
-                <CheckIcon className="h-4 w-4 mr-2 text-green-500" />
+                <Check className="h-4 w-4 mr-2 text-green-500" />
               ) : null}
               {t.healthyHabit}
             </Label>
@@ -500,25 +550,25 @@ export function HabitTracker() {
                   />
                   {habit.daysCount >= 7 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 h-4 w-4" />
                       <span className="text-sm font-medium">1 {t.week}</span>
                     </div>
                   )}
                   {habit.daysCount >= 14 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 h-4 w-4" />
                       <span className="text-sm font-medium">2 {t.weeks}</span>
                     </div>
                   )}
                   {habit.daysCount >= 21 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 h-4 w-4" />
                       <span className="text-sm font-medium">3 {t.weeks}</span>
                     </div>
                   )}
                   {habit.daysCount >= 30 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 h-4 w-4" />
                       <span className="text-sm font-medium">1 {t.month}</span>
                     </div>
                   )}
