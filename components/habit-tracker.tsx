@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Trash2, Languages, RotateCcw, Heart, Lightbulb } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,18 +20,51 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PlusIcon, MoonIcon, SunIcon, CheckIcon } from "@radix-ui/react-icons"
 
 interface Habit {
   id: number
   name: string
   daysCount: number
   isHealthy: boolean
-  lastCongratulated?: number
+  lastCongratulated: {
+    week: number
+    twoWeeks: number
+    threeWeeks: number
+    month: number
+  }
 }
 
 type Language = "en" | "ar"
 type Theme = "light" | "dark"
 type Filter = "all" | "healthy" | "unhealthy"
+
+const habitTips = {
+  en: [
+    "Start small: Focus on one habit at a time.",
+    "Be consistent: Try to practice your habit at the same time each day.",
+    "Use reminders: Set alarms or leave notes to help you remember your habit.",
+    "Track your progress: Seeing your improvements can be very motivating.",
+    "Be patient: It takes time to form a new habit, usually about 21 days.",
+    "Reward yourself: Celebrate your successes, no matter how small.",
+    "Don't be too hard on yourself: If you miss a day, just start again tomorrow.",
+    "Make it easy: Remove obstacles that might prevent you from doing your habit.",
+    "Pair your habit: Connect your new habit with an existing one.",
+    "Visualize success: Imagine yourself successfully completing your habit.",
+  ],
+  ar: [
+    "ابدأ بخطوات صغيرة: ركز على عادة واحدة في كل مرة.",
+    "كن متسقًا: حاول ممارسة عادتك في نفس الوقت كل يوم.",
+    "استخدم التذكيرات: اضبط المنبهات أو اترك ملاحظات لمساعدتك على تذكر عادتك.",
+    "تتبع تقدمك: رؤية تحسيناتك يمكن أن تكون محفزة للغاية.",
+    "كن صبورًا: يستغرق الأمر وقتًا لتكوين عادة جديدة، عادة حوالي 21 يومًا.",
+    "كافئ نفسك: احتفل بنجاحاتك، مهما كانت صغيرة.",
+    "لا تكن قاسيًا على نفسك: إذا فاتك يوم، فقط ابدأ من جديد غدًا.",
+    "اجعل الأمر سهلاً: أزل العقبات التي قد تمنعك من ممارسة عادتك.",
+    "اربط عادتك: اربط عادتك الجديدة بعادة موجودة بالفعل.",
+    "تخيل النجاح: تخيل نفسك وأنت تكمل عادتك بنجاح.",
+  ],
+}
 
 const translations = {
   en: {
@@ -63,7 +96,19 @@ const translations = {
     filterUnhealthy: "Unhealthy Habits",
     noHealthyHabits: "No healthy habits added yet. Start by adding a new healthy habit!",
     noUnhealthyHabits: "No unhealthy habits added yet. Start by adding a new unhealthy habit!",
-    congratulations: "Congratulations! You've maintained this habit for a month!",
+    congratulationsWeek: "Great job! You've maintained this habit for a week!",
+    congratulationsTwoWeeks: "Impressive! You've kept up with this habit for two weeks!",
+    congratulationsThreeWeeks: "Amazing progress! You've stuck with this habit for three weeks!",
+    congratulationsMonth: "Congratulations! You've maintained this habit for a month!",
+    week: "week",
+    weeks: "weeks",
+    month: "month",
+    characterEncouragement: "You're doing great! Keep it up!",
+    characterName: "Habby the Habit Helper",
+    characterHover: "Hi there! I'm Habby!",
+    getTip: "Get a Tip",
+    tipTitle: "Habit Tip",
+    habitTips: habitTips.en,
   },
   ar: {
     title: "متتبع العادات",
@@ -94,7 +139,19 @@ const translations = {
     filterUnhealthy: "العادات غير الصحية",
     noHealthyHabits: "لم تتم إضافة عادات صحية بعد. ابدأ بإضافة عادة صحية جديدة!",
     noUnhealthyHabits: "لم تتم إضافة عادات غير صحية بعد. ابدأ بإضافة عادة غير صحية جديدة!",
-    congratulations: "تهانينا! لقد حافظت على هذه العادة لمدة شهر!",
+    congratulationsWeek: "عمل رائع! لقد حافظت على هذه العادة لمدة أسبوع!",
+    congratulationsTwoWeeks: "مثير للإعجاب! لقد واظبت على هذه العادة لمدة أسبوعين!",
+    congratulationsThreeWeeks: "تقدم مذهل! لقد التزمت بهذه العادة لمدة ثلاثة أسابيع!",
+    congratulationsMonth: "تهانينا! لقد حافظت على هذه العادة لمدة شهر!",
+    week: "أسبوع",
+    weeks: "أسابيع",
+    month: "شهر",
+    characterEncouragement: "أنت تقوم بعمل رائع! واصل التقدم!",
+    characterName: "هابي مساعد العادات",
+    characterHover: "مرحبًا! أنا هابي!",
+    getTip: "احصل على نصيحة",
+    tipTitle: "نصيحة للعادات",
+    habitTips: habitTips.ar,
   },
 }
 
@@ -177,11 +234,25 @@ export function HabitTracker() {
       return
     }
     if (newHabit.trim() !== "") {
-      const habit = { id: Date.now(), name: newHabit, daysCount: 0, isHealthy }
+      const habit = { 
+        id: Date.now(), 
+        name: newHabit, 
+        daysCount: 0, 
+        isHealthy,
+        lastCongratulated: {
+          week: 0,
+          twoWeeks: 0,
+          threeWeeks: 0,
+          month: 0
+        }
+      }
       const updatedHabits = [...habits, habit]
       setHabits(updatedHabits)
       localStorage.setItem("habits", JSON.stringify(updatedHabits))
-      toast.success(t.habitAdded, { duration: 2000 })
+      toast.success(t.habitAdded, { 
+        duration: 2000,
+        icon: '🎉',
+      })
       setNewHabit("")
       setIsHealthy(false)
     } else {
@@ -220,10 +291,25 @@ export function HabitTracker() {
     const updatedHabits = habits.map((habit) => {
       if (habit.id === id) {
         const newDaysCount = habit.daysCount + 1
-        const shouldCongratulate = newDaysCount === 30 && (!habit.lastCongratulated || Date.now() - habit.lastCongratulated > 30 * 24 * 60 * 60 * 1000)
-        
-        if (shouldCongratulate) {
-          toast.success(t.congratulations, {
+        const now = Date.now()
+        let congratMessage = ''
+
+        if (newDaysCount === 7 && now - habit.lastCongratulated.week > 7 * 24 * 60 * 60 * 1000) {
+          congratMessage = t.congratulationsWeek
+          habit.lastCongratulated.week = now
+        } else if (newDaysCount === 14 && now - habit.lastCongratulated.twoWeeks > 14 * 24 * 60 * 60 * 1000) {
+          congratMessage = t.congratulationsTwoWeeks
+          habit.lastCongratulated.twoWeeks = now
+        } else if (newDaysCount === 21 && now - habit.lastCongratulated.threeWeeks > 21 * 24 * 60 * 60 * 1000) {
+          congratMessage = t.congratulationsThreeWeeks
+          habit.lastCongratulated.threeWeeks = now
+        } else if (newDaysCount === 30 && now - habit.lastCongratulated.month > 30 * 24 * 60 * 60 * 1000) {
+          congratMessage = t.congratulationsMonth
+          habit.lastCongratulated.month = now
+        }
+
+        if (congratMessage) {
+          toast.success(congratMessage, {
             duration: 5000,
             icon: '🎉',
           })
@@ -232,7 +318,6 @@ export function HabitTracker() {
         return {
           ...habit,
           daysCount: newDaysCount,
-          lastCongratulated: shouldCongratulate ? Date.now() : habit.lastCongratulated,
         }
       }
       return habit
@@ -254,6 +339,14 @@ export function HabitTracker() {
       const newTheme = prevTheme === "light" ? "dark" : "light"
       localStorage.setItem("theme", newTheme)
       return newTheme
+    })
+  }
+
+  const getRandomTip = () => {
+    const randomIndex = Math.floor(Math.random() * t.habitTips.length)
+    toast.success(t.habitTips[randomIndex], {
+      duration: 5000,
+      icon: '💡',
     })
   }
 
@@ -286,7 +379,7 @@ export function HabitTracker() {
           },
         }}
       />
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-8 w-full max-w-2xl transition-colors duration-300">
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-8 w-full max-w-2xl transition-colors duration-300 relative">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-center w-full text-gray-900 dark:text-white transition-colors duration-300">
             {t.title}
@@ -296,10 +389,12 @@ export function HabitTracker() {
               <Languages className="h-5 w-5" />
             </Button>
             <Button onClick={toggleTheme} variant="outline" size="icon" aria-label={t.toggleTheme}>
-              {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              {theme === "light" ? <MoonIcon className="h-5 w-5" /> : <SunIcon className="h-5 w-5" />}
             </Button>
           </div>
         </div>
+
+
         <div className="flex flex-col mb-6 space-y-4">
           <div className="flex">
             <Input
@@ -309,13 +404,12 @@ export function HabitTracker() {
               onChange={(e) => setNewHabit(e.target.value)}
               className={`${
                 lang === "ar" ? "ml-2" : "mr-2"
-              
               } flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300`}
               aria-label={t.enterHabit}
               maxLength={50}
             />
             <Button onClick={addHabit} aria-label={t.addHabit}>
-              <Plus className={lang === "ar" ? "ml-2" : "mr-2"} />
+              <PlusIcon className={lang === "ar" ? "ml-2" : "mr-2"} />
               {t.addHabit}
             </Button>
           </div>
@@ -326,7 +420,10 @@ export function HabitTracker() {
               onCheckedChange={setIsHealthy}
               className="data-[state=checked]:bg-green-500"
             />
-            <Label htmlFor="healthy-habit" className="text-sm font-medium">
+            <Label htmlFor="healthy-habit" className="text-sm font-medium flex items-center">
+              {isHealthy && lang === "ar" ? (
+                <CheckIcon className="h-4 w-4 mr-2 text-green-500" />
+              ) : null}
               {t.healthyHabit}
             </Label>
           </div>
@@ -340,6 +437,10 @@ export function HabitTracker() {
               <SelectItem value="unhealthy">{t.filterUnhealthy}</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={getRandomTip} className="w-full mt-2">
+            <Lightbulb className="w-4 h-4 mr-2" />
+            {t.getTip}
+          </Button>
         </div>
         {filteredHabits.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400 transition-colors duration-300">
@@ -376,10 +477,28 @@ export function HabitTracker() {
                     value={(habit.daysCount / 30) * 100} 
                     className={`w-full ${habit.isHealthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
                   />
+                  {habit.daysCount >= 7 && (
+                    <div className="mt-2 flex items-center text-green-500">
+                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <span className="text-sm font-medium">1 {t.week}</span>
+                    </div>
+                  )}
+                  {habit.daysCount >= 14 && (
+                    <div className="mt-2 flex items-center text-green-500">
+                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <span className="text-sm font-medium">2 {t.weeks}</span>
+                    </div>
+                  )}
+                  {habit.daysCount >= 21 && (
+                    <div className="mt-2 flex items-center text-green-500">
+                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <span className="text-sm font-medium">3 {t.weeks}</span>
+                    </div>
+                  )}
                   {habit.daysCount >= 30 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 h-4 w-4" />
-                      <span className="text-sm font-medium">{t.congratulations}</span>
+                      <CheckIcon className="mr-2 h-4 w-4" />
+                      <span className="text-sm font-medium">1 {t.month}</span>
                     </div>
                   )}
                 </CardContent>
