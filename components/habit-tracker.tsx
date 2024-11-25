@@ -167,7 +167,18 @@ const MAX_HABITS = 10
 const TOAST_LIMIT = 2
 const REMINDER_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
- 
+const sendNotification = (message: string) => {
+  if ("Notification" in window) {
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        new Notification("Habit Tracker", {
+          body: message,
+          icon: "/favicon.ico" // Make sure you have a favicon.ico in your public folder
+        });
+      }
+    });
+  }
+};
 
 export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
@@ -181,7 +192,6 @@ export function HabitTracker() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [remindersEnabled, setRemindersEnabled] = useState(false)
-  const [lastReminderTime, setLastReminderTime] = useState<number>(0);
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -210,9 +220,9 @@ export function HabitTracker() {
       }
     }
 
-    const storedLastReminderTime = localStorage.getItem("lastReminderTime");
-    if (storedLastReminderTime) {
-      setLastReminderTime(parseInt(storedLastReminderTime, 10));
+    const storedRemindersEnabled = localStorage.getItem("remindersEnabled")
+    if (storedRemindersEnabled) {
+      setRemindersEnabled(JSON.parse(storedRemindersEnabled))
     }
 
     // Load Arabic font
@@ -246,32 +256,29 @@ export function HabitTracker() {
   }, [toasts])
 
   useEffect(() => {
-    const checkAndShowReminder = () => {
-      const now = Date.now();
-      if (remindersEnabled && now - lastReminderTime >= REMINDER_INTERVAL) {
-        showReminderNotification();
-        setLastReminderTime(now);
-        localStorage.setItem("lastReminderTime", now.toString());
+    const checkAndSendReminder = () => {
+      const lastReminderTime = localStorage.getItem("lastReminderTime")
+      const now = Date.now()
+
+      if (!lastReminderTime || now - parseInt(lastReminderTime) >= REMINDER_INTERVAL) {
+        sendNotification(t.reminderMessage)
+        localStorage.setItem("lastReminderTime", now.toString())
       }
-    };
-
-    const intervalId = setInterval(checkAndShowReminder, 60000); // Check every minute
-
-    return () => clearInterval(intervalId);
-  }, [remindersEnabled, lastReminderTime, t.reminderMessage]);
-
-  const showReminderNotification = () => {
-    toast.success(t.reminderMessage, {
-      icon: '⏰',
-      duration: 5000,
-    });
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Habit Tracker", {
-        body: t.reminderMessage,
-        icon: "/favicon.ico"
-      });
     }
-  };
+
+    let intervalId: NodeJS.Timeout | null = null
+
+    if (remindersEnabled) {
+      checkAndSendReminder() // Check immediately when enabled
+      intervalId = setInterval(checkAndSendReminder, REMINDER_INTERVAL)
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [remindersEnabled, t.reminderMessage])
 
   const addHabit = () => {
     if (habits.length >= MAX_HABITS) {
@@ -410,24 +417,19 @@ export function HabitTracker() {
   }
 
   const toggleReminders = () => {
-    if (!remindersEnabled && "Notification" in window) {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          setRemindersEnabled(true);
-          toast.success(t.enableReminders, {
-            icon: '🔔',
-            duration: 2000,
-          });
-        }
-      });
-    } else {
-      setRemindersEnabled((prev) => !prev);
-      toast.success(remindersEnabled ? t.disableReminders : t.enableReminders, {
-        icon: remindersEnabled ? '🔕' : '🔔',
+    setRemindersEnabled((prev) => {
+      const newValue = !prev
+      localStorage.setItem("remindersEnabled", JSON.stringify(newValue))
+      if (newValue && "Notification" in window) {
+        Notification.requestPermission()
+      }
+      toast.success(newValue ? t.enableReminders : t.disableReminders, {
+        icon: newValue ? '🔔' : '🔕',
         duration: 2000,
-      });
-    }
-  };
+      })
+      return newValue
+    })
+  }
 
   const filteredHabits = habits.filter((habit) => {
     if (filter === "all") return true;
