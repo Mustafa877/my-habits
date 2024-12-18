@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check, Lightbulb, Bell, BellOff } from 'lucide-react'
+import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check, Lightbulb, Bell, BellOff, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,8 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
@@ -90,7 +89,8 @@ const translations = {
     reset: "Reset All",
     resetConfirmTitle: "Reset All Habits",
     resetConfirmDescription: "This will delete all your habits. Are you sure you want to continue?",
-    healthyHabit: "Healthy habit",
+    healthyHabit: "Healthy Habit",
+    unhealthyHabit: "Unhealthy Habit",
     filterAll: "All Habits",
     filterHealthy: "Healthy Habits",
     filterUnhealthy: "Unhealthy Habits",
@@ -138,6 +138,7 @@ const translations = {
     resetConfirmTitle: "إعادة تعيين جميع العادات",
     resetConfirmDescription: "سيؤدي هذا إلى حذف جميع عاداتك. هل أنت متأكد أنك تريد المتابعة؟",
     healthyHabit: "عادة صحية",
+    unhealthyHabit: "عادة غير صحية",
     filterAll: "جميع العادات",
     filterHealthy: "العادات الصحية",
     filterUnhealthy: "العادات غير الصحية",
@@ -479,7 +480,7 @@ export function HabitTracker() {
         </div>
 
         <div className="flex flex-col mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 rtl:space-x-reverse">
             <Input
               type="text"
               placeholder={t.enterHabit}
@@ -490,38 +491,45 @@ export function HabitTracker() {
               maxLength={50}
             />
             <Button onClick={addHabit} aria-label={t.addHabit} className="w-full sm:w-auto">
-              <Plus className="mr-2" />
+              <Plus className="mr-2 rtl:ml-2 rtl:mr-0" />
               {t.addHabit}
             </Button>
           </div>
-          <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 p-2 rounded-md">
-            <Switch
-              id="healthy-habit"
-              checked={isHealthy}
-              onCheckedChange={setIsHealthy}
-              className="data-[state=checked]:bg-green-500"
-            />
-            <Label htmlFor="healthy-habit" className="text-sm font-medium flex items-center">
-              {isHealthy && lang === "ar" ? (
-                <Check className="h-4 w-4 mr-2 text-green-500" />
-              ) : null}
-              {t.healthyHabit}
-            </Label>
-          </div>
-          <Select value={filter} onValueChange={(value: Filter) => setFilter(value)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={t.filterAll} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t.filterAll}</SelectItem>
-              <SelectItem value="healthy">{t.filterHealthy}</SelectItem>
-              <SelectItem value="unhealthy">{t.filterUnhealthy}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={getRandomTip} className="w-full mt-2">
-            <Lightbulb className="w-4 h-4 mr-2" />
-            {t.getTip}
+          <Button
+            onClick={() => setIsHealthy(!isHealthy)}
+            variant="outline"
+            className={`w-full justify-start text-left font-normal ${
+              isHealthy ? 'bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800' : 'bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800'
+            }`}
+          >
+            {isHealthy ? (
+              <>
+                <Heart className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
+                {t.healthyHabit}
+              </>
+            ) : (
+              <>
+                <X className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
+                {t.unhealthyHabit}
+              </>
+            )}
           </Button>
+          <div className="space-y-4">
+            <Select value={filter} onValueChange={(value: Filter) => setFilter(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={t.filterAll} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.filterAll}</SelectItem>
+                <SelectItem value="healthy">{t.filterHealthy}</SelectItem>
+                <SelectItem value="unhealthy">{t.filterUnhealthy}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={getRandomTip} className="w-full">
+              <Lightbulb className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />
+              {t.getTip}
+            </Button>
+          </div>
         </div>
         {filteredHabits.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400 transition-colors duration-300">
@@ -533,7 +541,7 @@ export function HabitTracker() {
               <Card key={habit.id} className="shadow-md border rounded-lg transition-colors duration-300">
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 px-4 py-2 border-b">
                   <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-300 flex items-center">
-                    {habit.isHealthy && <Heart className="mr-2 h-4 w-4 text-green-500" />}
+                    {habit.isHealthy && <Heart className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4 text-green-500" />}
                     {habit.name}
                   </CardTitle>
                   <Button
@@ -550,7 +558,7 @@ export function HabitTracker() {
                     <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
                       {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
                     </span>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 rtl:space-x-reverse">
                       <Button onClick={() => decrementDays(habit.id)} aria-label={`Decrease days for ${habit.name}`} variant="outline" size="sm">
                         {t.decreaseDays}
                       </Button>
@@ -565,25 +573,25 @@ export function HabitTracker() {
                   />
                   {habit.daysCount >= 7 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
                       <span className="text-sm font-medium">1 {t.week}</span>
                     </div>
                   )}
                   {habit.daysCount >= 14 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
                       <span className="text-sm font-medium">2 {t.weeks}</span>
                     </div>
                   )}
                   {habit.daysCount >= 21 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
                       <span className="text-sm font-medium">3 {t.weeks}</span>
                     </div>
                   )}
                   {habit.daysCount >= 30 && (
                     <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 h-4 w-4" />
+                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
                       <span className="text-sm font-medium">1 {t.month}</span>
                     </div>
                   )}
@@ -605,7 +613,7 @@ export function HabitTracker() {
         {habits.length > 0 && (
           <div className="mt-6 text-center">
             <Button onClick={resetAllHabits} variant="outline" className="w-full">
-              <RotateCcw className="mr-2 h-4 w-4" />
+              <RotateCcw className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
               {t.reset}
             </Button>
           </div>
@@ -619,8 +627,8 @@ export function HabitTracker() {
               {t.deleteConfirmDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
+          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 rtl:space-x-reverse">
+            <AlertDialogCancel className="mt-2 sm:mt-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
               {t.cancel}
             </AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-500 text-white hover:bg-red-600">
@@ -637,8 +645,8 @@ export function HabitTracker() {
               {t.resetConfirmDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
+          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 rtl:space-x-reverse">
+            <AlertDialogCancel className="mt-2 sm:mt-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
               {t.cancel}
             </AlertDialogCancel>
             <AlertDialogAction onClick={confirmReset} className="bg-red-500 text-white hover:bg-red-600">
