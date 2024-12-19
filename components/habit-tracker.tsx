@@ -17,6 +17,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
@@ -186,7 +188,10 @@ const sendNotification = (message: string) => {
 export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [newHabit, setNewHabit] = useState("")
-  const [isHealthy, setIsHealthy] = useState(false)
+  const [isHealthy, setIsHealthy] = useState(() => {
+    const stored = localStorage.getItem("isHealthy");
+    return stored ? JSON.parse(stored) : false;
+  })
   const [lang, setLang] = useState<Language>("en")
   const [theme, setTheme] = useState<Theme>("light")
   const [currentPage, setCurrentPage] = useState(1)
@@ -226,6 +231,11 @@ export function HabitTracker() {
     const storedRemindersEnabled = localStorage.getItem("remindersEnabled")
     if (storedRemindersEnabled) {
       setRemindersEnabled(JSON.parse(storedRemindersEnabled))
+    }
+
+    const storedIsHealthy = localStorage.getItem("isHealthy");
+    if (storedIsHealthy) {
+      setIsHealthy(JSON.parse(storedIsHealthy));
     }
 
     // Load Arabic font
@@ -310,10 +320,9 @@ export function HabitTracker() {
         icon: '🎉',
       })
       setNewHabit("")
-      setIsHealthy(false)
       setCurrentPage(Math.ceil(updatedHabits.length / ITEMS_PER_PAGE))
       setFilter("all")
-    } else {
+     } else {
       toast.error(t.enterHabitError, { duration: 2000 })
     }
   }
@@ -471,6 +480,7 @@ export function HabitTracker() {
     return () => clearInterval(intervalId)
   }, [autoIncrementDays])
 
+
   return (
     <div
       className={`flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
@@ -522,7 +532,11 @@ export function HabitTracker() {
             </Button>
           </div>
           <Button
-            onClick={() => setIsHealthy(!isHealthy)}
+            onClick={() => {
+              const newValue = !isHealthy;
+              setIsHealthy(newValue);
+              localStorage.setItem("isHealthy", JSON.stringify(newValue));
+            }}
             variant="outline"
             className={`w-full justify-start text-left font-normal ${
               isHealthy ? 'bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800' : 'bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800'
@@ -680,7 +694,7 @@ export function HabitTracker() {
             <AlertDialogCancel className="mt-2 sm:mt-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
               {t.cancel}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReset} className="bg-red-500 textwhite hover:bg-red-600">
+            <AlertDialogAction onClick={confirmReset} className="bg-red-500 text-white hover:bg-red-600">
               {t.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
