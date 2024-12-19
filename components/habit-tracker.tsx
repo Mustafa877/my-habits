@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check, Lightbulb, Bell, BellOff, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
@@ -25,6 +24,7 @@ interface Habit {
   name: string
   daysCount: number
   isHealthy: boolean
+  creationDate: Date
   lastCongratulated: {
     week: number
     twoWeeks: number
@@ -112,6 +112,7 @@ const translations = {
     enableReminders: "Enable Reminders",
     disableReminders: "Disable Reminders",
     reminderMessage: "Time to check on your habits!",
+    createdOn: "Created on:",
   },
   ar: {
     title: "متتبع العادات",
@@ -160,6 +161,7 @@ const translations = {
     enableReminders: "تفعيل التذكيرات",
     disableReminders: "إيقاف التذكيرات",
     reminderMessage: "حان الوقت للتحقق من عاداتك!",
+    createdOn: "تم إنشاؤها في:",
   },
 }
 
@@ -290,8 +292,9 @@ export function HabitTracker() {
       const habit = { 
         id: Date.now(),
         name: newHabit,
-        daysCount: 0,
+        daysCount: 1, 
         isHealthy,
+        creationDate: new Date(),
         lastCongratulated: {
           week: 0,
           twoWeeks: 0,
@@ -308,6 +311,8 @@ export function HabitTracker() {
       })
       setNewHabit("")
       setIsHealthy(false)
+      setCurrentPage(Math.ceil(updatedHabits.length / ITEMS_PER_PAGE))
+      setFilter("all")
     } else {
       toast.error(t.enterHabitError, { duration: 2000 })
     }
@@ -445,6 +450,27 @@ export function HabitTracker() {
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   const handlePreviousPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
 
+  const autoIncrementDays = useCallback(() => {
+    const now = new Date()
+    const lastIncrementDate = localStorage.getItem('lastIncrementDate')
+    
+    if (!lastIncrementDate || new Date(lastIncrementDate).getDate() !== now.getDate()) {
+      const updatedHabits = habits.map(habit => ({
+        ...habit,
+        daysCount: habit.daysCount + 1
+      }))
+      setHabits(updatedHabits)
+      localStorage.setItem('habits', JSON.stringify(updatedHabits))
+      localStorage.setItem('lastIncrementDate', now.toISOString())
+    }
+  }, [habits])
+
+  useEffect(() => {
+    autoIncrementDays()
+    const intervalId = setInterval(autoIncrementDays, 24 * 60 * 60 * 1000) // Check every 24 hours
+    return () => clearInterval(intervalId)
+  }, [autoIncrementDays])
+
   return (
     <div
       className={`flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
@@ -555,9 +581,14 @@ export function HabitTracker() {
                 </CardHeader>
                 <CardContent className="p-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-2 sm:space-y-0">
-                    <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
-                      {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
-                    </span>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
+                        {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
+                      </span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        {t.createdOn} {new Date(habit.creationDate).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
+                      </p>
+                    </div>
                     <div className="flex space-x-2 rtl:space-x-reverse">
                       <Button onClick={() => decrementDays(habit.id)} aria-label={`Decrease days for ${habit.name}`} variant="outline" size="sm">
                         {t.decreaseDays}
@@ -649,7 +680,7 @@ export function HabitTracker() {
             <AlertDialogCancel className="mt-2 sm:mt-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
               {t.cancel}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReset} className="bg-red-500 text-white hover:bg-red-600">
+            <AlertDialogAction onClick={confirmReset} className="bg-red-500 textwhite hover:bg-red-600">
               {t.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
