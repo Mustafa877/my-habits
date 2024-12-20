@@ -114,6 +114,7 @@ const translations = {
     disableReminders: "Disable Reminders",
     reminderMessage: "Time to check on your habits!",
     createdOn: "Created on:",
+    offlineMessage: "You are currently offline. Some features may be limited.",
   },
   ar: {
     title: "متتبع العادات",
@@ -163,6 +164,7 @@ const translations = {
     disableReminders: "إيقاف التذكيرات",
     reminderMessage: "حان الوقت للتحقق من عاداتك!",
     createdOn: "تم إنشاؤها في:",
+    offlineMessage: "أنت حاليا غير متصل بالإنترنت. قد تكون بعض الميزات محدودة.",
   },
 }
 
@@ -196,6 +198,7 @@ export function HabitTracker() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [remindersEnabled, setRemindersEnabled] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -288,6 +291,24 @@ export function HabitTracker() {
       }
     }
   }, [remindersEnabled, t.reminderMessage])
+
+  useEffect(() => {
+    function onlineHandler() {
+      setIsOnline(true);
+    }
+
+    function offlineHandler() {
+      setIsOnline(false);
+    }
+
+    window.addEventListener("online", onlineHandler);
+    window.addEventListener("offline", offlineHandler);
+
+    return () => {
+      window.removeEventListener("online", onlineHandler);
+      window.removeEventListener("offline", offlineHandler);
+    };
+  }, []);
 
   const addHabit = () => {
     if (habits.length >= MAX_HABITS) {
@@ -701,6 +722,11 @@ export function HabitTracker() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {!isOnline && (
+        <div className="fixed bottom-4 right-4 bg-yellow-500 text-white p-2 rounded-md">
+          {t.offlineMessage}
+        </div>
+      )}
     </div>
   )
 }
