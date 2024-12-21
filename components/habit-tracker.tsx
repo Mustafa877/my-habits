@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
@@ -463,27 +464,6 @@ export function HabitTracker() {
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   const handlePreviousPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
 
-  const autoIncrementDays = useCallback(() => {
-    const now = new Date()
-    const lastIncrementDate = localStorage.getItem('lastIncrementDate')
-    
-    if (!lastIncrementDate || new Date(lastIncrementDate).getDate() !== now.getDate()) {
-      const updatedHabits = habits.map(habit => ({
-        ...habit,
-        daysCount: habit.daysCount + 1
-      }))
-      setHabits(updatedHabits)
-      localStorage.setItem('habits', JSON.stringify(updatedHabits))
-      localStorage.setItem('lastIncrementDate', now.toISOString())
-    }
-  }, [habits])
-
-  useEffect(() => {
-    autoIncrementDays()
-    const intervalId = setInterval(autoIncrementDays, 24 * 60 * 60 * 1000) // Check every 24 hours
-    return () => clearInterval(intervalId)
-  }, [autoIncrementDays])
-
 
   return (
     <div
@@ -703,3 +683,4 @@ export function HabitTracker() {
     </div>
   )
 }
+
