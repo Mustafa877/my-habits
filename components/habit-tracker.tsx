@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Check, Lightbulb, Bell, BellOff, X } from 'lucide-react'
+import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Lightbulb, Bell, BellOff, X, ArrowUp } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
@@ -73,6 +74,7 @@ const translations = {
     daysStreak: "Days streak:",
     increaseDays: "Increase Days",
     decreaseDays: "Decrease Days",
+    increaseAllDays: "Increase All Days",
     habitAdded: "Habit added successfully!",
     habitRemoved: "Habit removed.",
     enterHabitError: "Please enter a habit before adding",
@@ -113,6 +115,7 @@ const translations = {
     disableReminders: "Disable Reminders",
     reminderMessage: "Time to check on your habits!",
     createdOn: "Created on:",
+    allHabitsIncreased: "All habits increased by one day!",
   },
   ar: {
     title: "متتبع العادات",
@@ -122,6 +125,7 @@ const translations = {
     daysStreak: "أيام متتالية:",
     increaseDays: "زيادة الأيام",
     decreaseDays: "تقليل الأيام",
+    increaseAllDays: "زيادة جميع الأيام",
     habitAdded: "تمت إضافة العادة بنجاح",
     habitRemoved: "تمت إزالة العادة",
     enterHabitError: "يرجى إدخال العادة قبل الإضافة",
@@ -162,10 +166,11 @@ const translations = {
     disableReminders: "إيقاف التذكيرات",
     reminderMessage: "حان الوقت للتحقق من عاداتك!",
     createdOn: "تم إنشاؤها في:",
+    allHabitsIncreased: "تمت زيادة جميع العادات بيوم واحد!",
   },
 }
 
-const ITEMS_PER_PAGE = 3
+const ITEMS_PER_PAGE = 4
 const MAX_HABITS = 10
 const TOAST_LIMIT = 2
 const REMINDER_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -403,6 +408,16 @@ export function HabitTracker() {
     localStorage.setItem("habits", JSON.stringify(updatedHabits))
   }
 
+  const incrementAllDays = () => {
+    const updatedHabits = habits.map(habit => ({...habit, daysCount: habit.daysCount + 1}))
+    setHabits(updatedHabits)
+    localStorage.setItem("habits", JSON.stringify(updatedHabits))
+    toast.success(t.allHabitsIncreased, {
+      duration: 2000,
+      icon: '🎉',
+    })
+  }
+
   const toggleLanguage = () => {
     setLang((prevLang) => {
       const newLang = prevLang === "en" ? "ar" : "en"
@@ -463,50 +478,16 @@ export function HabitTracker() {
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   const handlePreviousPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
 
-  const autoIncrementDays = useCallback(() => {
-    const now = new Date()
-    const lastIncrementDate = localStorage.getItem('lastIncrementDate')
-    
-    if (!lastIncrementDate || new Date(lastIncrementDate).getDate() !== now.getDate()) {
-      const updatedHabits = habits.map(habit => ({
-        ...habit,
-        daysCount: habit.daysCount + 1
-      }))
-      setHabits(updatedHabits)
-      localStorage.setItem('habits', JSON.stringify(updatedHabits))
-      localStorage.setItem('lastIncrementDate', now.toISOString())
-    }
-  }, [habits])
-
-  useEffect(() => {
-    autoIncrementDays()
-    const intervalId = setInterval(autoIncrementDays, 24 * 60 * 60 * 1000) // Check every 24 hours
-    return () => clearInterval(intervalId)
-  }, [autoIncrementDays])
-
-
   return (
-    <div
-      className={`flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
-        lang === "ar" ? "font-arabic" : ""
-      }`}
-    >
-      <Toaster
-        position={lang === "ar" ? "top-left" : "top-right"}
-        toastOptions={{
-          duration: 2000,
-          style: {
-            background: theme === "dark" ? "#333" : "#fff",
-            color: theme === "dark" ? "#fff" : "#333",
-          },
-        }}
-      />
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 sm:p-8 w-full max-w-2xl transition-colors duration-300 relative">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-center w-full sm:w-auto text-gray-900 dark:text-white transition-colors duration-300 mb-4 sm:mb-0">
+    <div className={`flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
+      lang === "ar" ? "font-arabic" : ""
+    }`}>
+      <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-md p-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white transition-colors duration-300">
             {t.title}
           </h1>
-          <div className={`flex ${lang === "ar" ? "space-x-reverse space-x-2" : "space-x-2"}`}>
+          <div className="flex space-x-2 rtl:space-x-reverse">
             <Button onClick={toggleLanguage} variant="outline" size="icon" aria-label={t.toggleLanguage}>
               <Languages className="h-5 w-5" />
             </Button>
@@ -518,19 +499,30 @@ export function HabitTracker() {
             </Button>
           </div>
         </div>
-
-        <div className="flex flex-col mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 rtl:space-x-reverse">
+      </header>
+      <main className="flex-grow p-4 md:p-6 container mx-auto max-w-4xl">
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            duration: 2000,
+            style: {
+              background: theme === "dark" ? "#333" : "#fff",
+              color: theme === "dark" ? "#fff" : "#333",
+            },
+          }}
+        />
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 rtl:space-x-reverse">
             <Input
               type="text"
               placeholder={t.enterHabit}
               value={newHabit}
               onChange={(e) => setNewHabit(e.target.value)}
-              className="flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300"
+              className="flex-grow bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-300"
               aria-label={t.enterHabit}
               maxLength={50}
             />
-            <Button onClick={addHabit} aria-label={t.addHabit} className="w-full sm:w-auto">
+            <Button onClick={addHabit} className="w-full md:w-auto">
               <Plus className="mr-2 rtl:ml-2 rtl:mr-0" />
               {t.addHabit}
             </Button>
@@ -554,9 +546,9 @@ export function HabitTracker() {
               </>
             )}
           </Button>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <Select value={filter} onValueChange={(value: Filter) => setFilter(value)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger>
                 <SelectValue placeholder={t.filterAll} />
               </SelectTrigger>
               <SelectContent>
@@ -565,7 +557,7 @@ export function HabitTracker() {
                 <SelectItem value="unhealthy">{t.filterUnhealthy}</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={getRandomTip} className="w-full">
+            <Button onClick={getRandomTip}>
               <Lightbulb className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />
               {t.getTip}
             </Button>
@@ -576,10 +568,10 @@ export function HabitTracker() {
             {filter === "all" ? t.noHabits : filter === "healthy" ? t.noHealthyHabits : t.noUnhealthyHabits}
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {displayedHabits.map((habit) => (
-              <Card key={habit.id} className="shadow-md border rounded-lg transition-colors duration-300">
-                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 px-4 py-2 border-b">
+              <Card key={habit.id} className="flex flex-col shadow-md border rounded-lg transition-colors duration-300">
+                <CardHeader className="flex items-start justify-between space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-300 flex items-center">
                     {habit.isHealthy && <Heart className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4 text-green-500" />}
                     {habit.name}
@@ -593,22 +585,17 @@ export function HabitTracker() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-2 sm:space-y-0">
-                    <div>
-                      <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
-                        {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
-                      </span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {t.createdOn} {new Date(habit.creationDate).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
-                      </p>
-                    </div>
+                <CardContent className="pt-0">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
+                      {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
+                    </span>
                     <div className="flex space-x-2 rtl:space-x-reverse">
                       <Button onClick={() => decrementDays(habit.id)} aria-label={`Decrease days for ${habit.name}`} variant="outline" size="sm">
-                        {t.decreaseDays}
+                        -
                       </Button>
                       <Button onClick={() => incrementDays(habit.id)} aria-label={`Increase days for ${habit.name}`} size="sm">
-                        {t.increaseDays}
+                        +
                       </Button>
                     </div>
                   </div>
@@ -616,54 +603,37 @@ export function HabitTracker() {
                     value={(habit.daysCount / 30) * 100} 
                     className={`w-full ${habit.isHealthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
                   />
-                  {habit.daysCount >= 7 && (
-                    <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
-                      <span className="text-sm font-medium">1 {t.week}</span>
-                    </div>
-                  )}
-                  {habit.daysCount >= 14 && (
-                    <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
-                      <span className="text-sm font-medium">2 {t.weeks}</span>
-                    </div>
-                  )}
-                  {habit.daysCount >= 21 && (
-                    <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
-                      <span className="text-sm font-medium">3 {t.weeks}</span>
-                    </div>
-                  )}
-                  {habit.daysCount >= 30 && (
-                    <div className="mt-2 flex items-center text-green-500">
-                      <Check className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
-                      <span className="text-sm font-medium">1 {t.month}</span>
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    {t.createdOn} {new Date(habit.creationDate).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
+                  </p>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
         {filteredHabits.length > ITEMS_PER_PAGE && (
-          <div className="flex justify-between mt-4">
-            <Button onClick={handlePreviousPage} disabled={currentPage === 1}>
+          <div className="flex justify-between mt-6">
+            <Button onClick={handlePreviousPage} disabled={currentPage === 1} className="w-24">
               {t.previous}
             </Button>
-            <Button onClick={handleNextPage} disabled={currentPage === totalPages}>
+            <Button onClick={handleNextPage} disabled={currentPage === totalPages} className="w-24">
               {t.next}
             </Button>
           </div>
         )}
         {habits.length > 0 && (
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-2">
+            <Button onClick={incrementAllDays} className="w-full">
+              <ArrowUp className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
+              {t.increaseAllDays}
+            </Button>
             <Button onClick={resetAllHabits} variant="outline" className="w-full">
               <RotateCcw className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4" />
               {t.reset}
             </Button>
           </div>
         )}
-      </div>
+      </main>
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
           <AlertDialogHeader>
@@ -694,7 +664,7 @@ export function HabitTracker() {
             <AlertDialogCancel className="mt-2 sm:mt-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600">
               {t.cancel}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmReset} className="bg-red-500 textwhite hover:bg-red-600">
+            <AlertDialogAction onClick={confirmReset} className="bg-red-500 text-white hover:bg-red-600">
               {t.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -703,3 +673,4 @@ export function HabitTracker() {
     </div>
   )
 }
+
