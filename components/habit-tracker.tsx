@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Habit {
@@ -478,6 +479,7 @@ export function HabitTracker() {
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   const handlePreviousPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
 
+
   return (
     <div className={`flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
       lang === "ar" ? "font-arabic" : ""
@@ -673,4 +675,6 @@ export function HabitTracker() {
     </div>
   )
 }
+
+
 
