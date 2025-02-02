@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Lightbulb, Bell, BellOff, X, ArrowUp } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
+import { Plus, Trash2, Languages, Moon, Sun, RotateCcw, Heart, Lightbulb, Bell, BellOff, X, ArrowUp, LogOut } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,16 +21,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+// Initialize Supabase client
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+
 interface Habit {
-  id: number
+  id: string
   name: string
-  daysCount: number
-  isHealthy: boolean
-  creationDate: Date
-  lastCongratulated: {
+  days_count: number
+  is_healthy: boolean
+  creation_date: Date
+  last_congratulated: {
     week: number
     twoWeeks: number
     threeWeeks: number
@@ -117,6 +122,7 @@ const translations = {
     reminderMessage: "Time to check on your habits!",
     createdOn: "Created on:",
     allHabitsIncreased: "All habits increased by one day!",
+    signOut: "Sign Out",
   },
   ar: {
     title: "متتبع العادات",
@@ -168,6 +174,7 @@ const translations = {
     reminderMessage: "حان الوقت للتحقق من عاداتك!",
     createdOn: "تم إنشاؤها في:",
     allHabitsIncreased: "تمت زيادة جميع العادات بيوم واحد!",
+    signOut: "تسجيل الخروج",
   },
 }
 
@@ -189,7 +196,7 @@ const sendNotification = (message: string) => {
   }
 };
 
-export function HabitTracker() {
+export default function Component() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [newHabit, setNewHabit] = useState("")
   const [isHealthy, setIsHealthy] = useState(false)
@@ -197,10 +204,11 @@ export function HabitTracker() {
   const [theme, setTheme] = useState<Theme>("light")
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [habitToDelete, setHabitToDelete] = useState<number | null>(null)
+  const [habitToDelete, setHabitToDelete] = useState<string | null>(null)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [remindersEnabled, setRemindersEnabled] = useState(false)
+  const [user, setUser] = useState<{ id: string } | null>(null)
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -219,16 +227,6 @@ export function HabitTracker() {
       setTheme(prefersDark ? "dark" : "light")
     }
 
-    const storedHabits = localStorage.getItem("habits")
-    if (storedHabits) {
-      try {
-        setHabits(JSON.parse(storedHabits))
-      } catch (error) {
-        console.error("Error parsing stored habits:", error)
-        localStorage.removeItem("habits")
-      }
-    }
-
     const storedRemindersEnabled = localStorage.getItem("remindersEnabled")
     if (storedRemindersEnabled) {
       setRemindersEnabled(JSON.parse(storedRemindersEnabled))
@@ -244,6 +242,25 @@ export function HabitTracker() {
     link.href = "https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700&display=swap"
     link.rel = "stylesheet"
     document.head.appendChild(link)
+
+    // Check user session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        fetchHabits(session.user.id)
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        fetchHabits(session.user.id)
+      } else {
+        setHabits([])
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
@@ -294,52 +311,84 @@ export function HabitTracker() {
     }
   }, [remindersEnabled, t.reminderMessage])
 
-  const addHabit = () => {
+  const fetchHabits = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+    
+    if (error) {
+      console.error('Error fetching habits:', error)
+    } else {
+      setHabits(data || [])
+    }
+  }
+
+  const addHabit = async () => {
+    if (!user) return
+
     if (habits.length >= MAX_HABITS) {
       toast.error(t.maxHabitsReached, { duration: 2000 })
       return
     }
     if (newHabit.trim() !== "") {
       const habit = { 
-        id: Date.now(),
+        user_id: user.id,
         name: newHabit,
-        daysCount: 1, 
-        isHealthy,
-        creationDate: new Date(),
-        lastCongratulated: {
+        days_count: 1, 
+        is_healthy: isHealthy,
+        creation_date: new Date(),
+        last_congratulated: {
           week: 0,
           twoWeeks: 0,
           threeWeeks: 0,
           month: 0
         }
       }
-      const updatedHabits = [...habits, habit]
-      setHabits(updatedHabits)
-      localStorage.setItem("habits", JSON.stringify(updatedHabits))
-      toast.success(t.habitAdded, {
-        duration: 2000,
-        icon: '🎉',
-      })
-      setNewHabit("")
-      setIsHealthy(false)
-      setCurrentPage(Math.ceil(updatedHabits.length / ITEMS_PER_PAGE))
-      setFilter("all")
+      const { data, error } = await supabase
+        .from('habits')
+        .insert([habit])
+        .select()
+
+      if (error) {
+        console.error('Error adding habit:', error)
+        toast.error(error.message, { duration: 2000 })
+      } else if (data) {
+        setHabits([...habits, data[0]])
+        toast.success(t.habitAdded, {
+          duration: 2000,
+          icon: '🎉',
+        })
+        setNewHabit("")
+        setIsHealthy(false)
+        setCurrentPage(Math.ceil((habits.length + 1) / ITEMS_PER_PAGE))
+        setFilter("all")
+      }
     } else {
       toast.error(t.enterHabitError, { duration: 2000 })
     }
   }
 
-  const removeHabit = (id: number) => {
+  const removeHabit = (id: string) => {
     setHabitToDelete(id)
     setDeleteConfirmOpen(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (habitToDelete !== null) {
-      const updatedHabits = habits.filter((habit) => habit.id !== habitToDelete)
-      setHabits(updatedHabits)
-      localStorage.setItem("habits", JSON.stringify(updatedHabits))
-      toast(t.habitRemoved, { icon: "🗑️", duration: 2000 })
+      const { error } = await supabase
+        .from('habits')
+        .delete()
+        .eq('id', habitToDelete)
+
+      if (error) {
+        console.error('Error deleting habit:', error)
+        toast.error(error.message, { duration: 2000 })
+      } else {
+        const updatedHabits = habits.filter((habit) => habit.id !== habitToDelete)
+        setHabits(updatedHabits)
+        toast(t.habitRemoved, { icon: "🗑️", duration: 2000 })
+      }
       setDeleteConfirmOpen(false)
       setHabitToDelete(null)
     }
@@ -349,74 +398,108 @@ export function HabitTracker() {
     setResetConfirmOpen(true)
   }
 
-  const confirmReset = () => {
-    setHabits([])
-    localStorage.removeItem("habits")
-    toast.success(t.habitRemoved, { duration: 2000 })
+  const confirmReset = async () => {
+    if (!user) return
+
+    const { error } = await supabase
+      .from('habits')
+      .delete()
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error resetting habits:', error)
+      toast.error(error.message, { duration: 2000 })
+    } else {
+      setHabits([])
+      toast.success(t.habitRemoved, { duration: 2000 })
+    }
     setResetConfirmOpen(false)
   }
 
-  const incrementDays = (id: number) => {
-    const updatedHabits = habits.map((habit) => {
-      if (habit.id === id) {
-        const newDaysCount = habit.daysCount + 1
-        const now = Date.now()
-        let congratMessage = ''
+  const incrementDays = async (id: string) => {
+    const habitToUpdate = habits.find(habit => habit.id === id)
+    if (!habitToUpdate) return
 
-        if (newDaysCount === 7 && now - habit.lastCongratulated.week > 7 * 24 * 60 * 60 * 1000) {
-          congratMessage = t.congratulationsWeek
-          habit.lastCongratulated.week = now
-        } else if (newDaysCount === 14 && now - habit.lastCongratulated.twoWeeks > 14 * 24 * 60 * 60 * 1000) {
-          congratMessage = t.congratulationsTwoWeeks
-          habit.lastCongratulated.twoWeeks = now
-        } else if (newDaysCount === 21 && now - habit.lastCongratulated.threeWeeks > 21 * 24 * 60 * 60 * 1000) {
-          congratMessage = t.congratulationsThreeWeeks
-          habit.lastCongratulated.threeWeeks = now
-        } else if (newDaysCount === 30 && now - habit.lastCongratulated.month > 30 * 24 * 60 * 60 * 1000) {
-          congratMessage = t.congratulationsMonth
-          habit.lastCongratulated.month = now
-        }
+    const newDaysCount = habitToUpdate.days_count + 1
+    const now = Date.now()
+    let congratMessage = ''
+    const lastCongratulated = { ...habitToUpdate.last_congratulated }
 
-        if (congratMessage) {
-          toast.success(congratMessage, {
-            duration: 5000,
-            icon: '🎉',
-          })
-        }
+    if (newDaysCount === 7 && now - lastCongratulated.week > 7 * 24 * 60 * 60 * 1000) {
+      congratMessage = t.congratulationsWeek
+      lastCongratulated.week = now
+    } else if (newDaysCount === 14 && now - lastCongratulated.twoWeeks > 14 * 24 * 60 * 60 * 1000) {
+      congratMessage = t.congratulationsTwoWeeks
+      lastCongratulated.twoWeeks = now
+    } else if (newDaysCount === 21 && now - lastCongratulated.threeWeeks > 21 * 24 * 60 * 60 * 1000) {
+      congratMessage = t.congratulationsThreeWeeks
+      lastCongratulated.threeWeeks = now
+    } else if (newDaysCount === 30 && now - lastCongratulated.month > 30 * 24 * 60 * 60 * 1000) {
+      congratMessage = t.congratulationsMonth
+      lastCongratulated.month = now
+    }
 
-        return {
-          ...habit,
-          daysCount: newDaysCount,
-        }
+    const { data, error } = await supabase
+      .from('habits')
+      .update({ days_count: newDaysCount, last_congratulated: lastCongratulated })
+      .eq('id', id)
+      .select()
+
+    if (error) {
+      console.error('Error updating habit:', error)
+      toast.error(error.message, { duration: 2000 })
+    } else if (data) {
+      const updatedHabits = habits.map(habit => 
+        habit.id === id ? { ...habit, days_count: newDaysCount, last_congratulated: lastCongratulated } : habit
+      )
+      setHabits(updatedHabits)
+
+      if (congratMessage) {
+        toast.success(congratMessage, {
+          duration: 5000,
+          icon: '🎉',
+        })
       }
-      return habit
-    })
-    setHabits(updatedHabits)
-    localStorage.setItem("habits", JSON.stringify(updatedHabits))
+    }
   }
 
-  const decrementDays = (id: number) => {
-    const updatedHabits = habits.map((habit) => {
-      if (habit.id === id && habit.daysCount > 0) {
-        return {
-          ...habit,
-          daysCount: habit.daysCount - 1,
-        }
-      }
-      return habit
-    })
-    setHabits(updatedHabits)
-    localStorage.setItem("habits", JSON.stringify(updatedHabits))
+  const decrementDays = async (id: string) => {
+    const habitToUpdate = habits.find(habit => habit.id === id)
+    if (!habitToUpdate || habitToUpdate.days_count <= 0) return
+
+    const { data, error } = await supabase
+      .from('habits')
+      .update({ days_count: habitToUpdate.days_count - 1 })
+      .eq('id', id)
+      .select()
+
+    if (error) {
+      console.error('Error updating habit:', error)
+      toast.error(error.message, { duration: 2000 })
+    } else if (data) {
+      const updatedHabits = habits.map(habit => 
+        habit.id === id ? { ...habit, days_count: habit.days_count - 1 } : habit
+      )
+      setHabits(updatedHabits)
+    }
   }
 
-  const incrementAllDays = () => {
-    const updatedHabits = habits.map(habit => ({...habit, daysCount: habit.daysCount + 1}))
-    setHabits(updatedHabits)
-    localStorage.setItem("habits", JSON.stringify(updatedHabits))
-    toast.success(t.allHabitsIncreased, {
-      duration: 2000,
-      icon: '🎉',
-    })
+  const incrementAllDays = async () => {
+    if (!user) return
+
+    const {  error } = await supabase.rpc('increment_all_habits', { user_id: user.id })
+
+    if (error) {
+      console.error('Error incrementing all habits:', error)
+      toast.error(error.message, { duration: 2000 })
+    } else {
+      const updatedHabits = habits.map(habit => ({ ...habit, days_count: habit.days_count + 1 }))
+      setHabits(updatedHabits)
+      toast.success(t.allHabitsIncreased, {
+        duration: 2000,
+        icon: '🎉',
+      })
+    }
   }
 
   const toggleLanguage = () => {
@@ -468,8 +551,8 @@ export function HabitTracker() {
 
   const filteredHabits = habits.filter((habit) => {
     if (filter === "all") return true;
-    if (filter === "healthy") return habit.isHealthy;
-    if (filter === "unhealthy") return !habit.isHealthy;
+    if (filter === "healthy") return habit.is_healthy;
+    if (filter === "unhealthy") return !habit.is_healthy;
     return true;
   });
 
@@ -479,6 +562,38 @@ export function HabitTracker() {
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
   const handlePreviousPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
 
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+          <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">{t.title}</h1>
+          <Auth
+            supabaseClient={supabase}
+            appearance={{ theme: ThemeSupa }}
+            theme={theme}
+            localization={{
+              variables: {
+                sign_up: {
+                  email_label: lang === 'ar' ? 'البريد الإلكتروني' : 'Email',
+                  password_label: lang === 'ar' ? 'كلمة المرور' : 'Password',
+                  button_label: lang === 'ar' ? 'إنشاء حساب' : 'Sign up',
+                },
+                sign_in: {
+                  email_label: lang === 'ar' ? 'البريد الإلكتروني' : 'Email',
+                  password_label: lang === 'ar' ? 'كلمة المرور' : 'Password',
+                  button_label: lang === 'ar' ? 'تسجيل الدخول' : 'Sign in',
+                },
+              },
+            }}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
@@ -498,6 +613,9 @@ export function HabitTracker() {
             </Button>
             <Button onClick={toggleReminders} variant="outline" size="icon" aria-label={remindersEnabled ? t.disableReminders : t.enableReminders}>
               {remindersEnabled ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+            </Button>
+            <Button onClick={signOut} variant="outline" size="icon" aria-label={t.signOut}>
+              <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -575,7 +693,7 @@ export function HabitTracker() {
               <Card key={habit.id} className="flex flex-col shadow-md border rounded-lg transition-colors duration-300">
                 <CardHeader className="flex items-start justify-between space-y-0 pb-2">
                   <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-300 flex items-center">
-                    {habit.isHealthy && <Heart className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4 text-green-500" />}
+                    {habit.is_healthy && <Heart className="mr-2 rtl:ml-2 rtl:mr-0 h-4 w-4 text-green-500" />}
                     {habit.name}
                   </CardTitle>
                   <Button
@@ -590,7 +708,7 @@ export function HabitTracker() {
                 <CardContent className="pt-0">
                   <div className="flex justify-between items-center mb-2">
                     <span className="font-medium text-gray-700 dark:text-gray-300 transition-colors duration-300">
-                      {habit.isHealthy ? t.daysStreak : t.daysWithout} {habit.daysCount}
+                      {habit.is_healthy ? t.daysStreak : t.daysWithout} {habit.days_count}
                     </span>
                     <div className="flex space-x-2 rtl:space-x-reverse">
                       <Button onClick={() => decrementDays(habit.id)} aria-label={`Decrease days for ${habit.name}`} variant="outline" size="sm">
@@ -602,11 +720,11 @@ export function HabitTracker() {
                     </div>
                   </div>
                   <Progress 
-                    value={(habit.daysCount / 30) * 100} 
-                    className={`w-full ${habit.isHealthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
+                    value={(habit.days_count / 30) * 100} 
+                    className={`w-full ${habit.is_healthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    {t.createdOn} {new Date(habit.creationDate).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
+                    {t.createdOn} {new Date(habit.creation_date).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
                   </p>
                 </CardContent>
               </Card>
@@ -675,6 +793,3 @@ export function HabitTracker() {
     </div>
   )
 }
-
-
-
