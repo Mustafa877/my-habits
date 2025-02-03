@@ -129,6 +129,9 @@ const translations = {
     createdOn: "Created on:",
     allHabitsIncreased: "All habits increased by one day!",
     signOut: "Sign Out",
+    signInWithGoogle: "Sign in with Google",
+    or: "or",
+    signInWithEmail: "Sign in with Email",
   },
   ar: {
     title: "متتبع العادات",
@@ -181,6 +184,9 @@ const translations = {
     createdOn: "تم إنشاؤها في:",
     allHabitsIncreased: "تمت زيادة جميع العادات بيوم واحد!",
     signOut: "تسجيل الخروج",
+    signInWithGoogle: "تسجيل الدخول باستخدام Google",
+    or: "أو",
+    signInWithEmail: "تسجيل الدخول باستخدام البريد الإلكتروني",
   },
 }
 
@@ -202,7 +208,7 @@ const sendNotification = (message: string) => {
   }
 };
 
-export function HabitTracker() {
+export default function Component() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [newHabit, setNewHabit] = useState("")
   const [isHealthy, setIsHealthy] = useState(false)
@@ -339,7 +345,7 @@ export function HabitTracker() {
     }
     if (newHabit.trim() !== "") {
       const habit = { 
-        user_id: user!.id,
+        user_id: user.id,
         name: newHabit,
         days_count: 1, 
         is_healthy: isHealthy,
@@ -584,14 +590,15 @@ export function HabitTracker() {
               variables: {
                 default: {
                   colors: {
-                    brand: 'rgb(59, 130, 246)',
-                    brandAccent: 'rgb(37, 99, 235)',
+                    brand: 'rgb(19, 19, 19)',
+                    brandAccent: 'rgb(34, 34, 34)',
                   },
                 },
               },
             }}
             theme={theme}
             providers={['google']}
+            view="magic_link"
             localization={{
               variables: {
                 sign_up: {
@@ -607,6 +614,15 @@ export function HabitTracker() {
               },
             }}
           />
+          {/* <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">{t.or}</p>
+            <Button
+              onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+              className="mt-2 w-full"
+            >
+              {t.signInWithGoogle}
+            </Button>
+          </div> */}
         </div>
       </div>
     )
@@ -738,7 +754,7 @@ export function HabitTracker() {
                   </div>
                   <Progress 
                     value={(habit.days_count / 30) * 100} 
-                    className={`w-full ${habit.is_healthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
+                    className={`w-full ${habit.is_healthy ? 'bggreen-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                     {t.createdOn} {new Date(habit.creation_date).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
@@ -750,10 +766,10 @@ export function HabitTracker() {
         )}
         {filteredHabits.length > ITEMS_PER_PAGE && (
           <div className="flex justify-between mt-6">
-            <Button onClick={handlePreviousPage} disabled={currentPage=== 1} className="w-24">
+            <Button onClick={handlePreviousPage} disabled={currentPage === 1} className="w-24">
               {t.previous}
             </Button>
-            <Button onClick={handleNextPage}disabled={currentPage === totalPages} className="w-24">
+            <Button onClick={handleNextPage} disabled={currentPage === totalPages} className="w-24">
               {t.next}
             </Button>
           </div>
