@@ -40,6 +40,12 @@ interface Habit {
   }
 }
 
+type User = {
+  id: string;
+  email?: string;
+  // Add other relevant user properties here
+};
+
 type Language = "en" | "ar"
 type Theme = "light" | "dark"
 type Filter = "all" | "healthy" | "unhealthy"
@@ -196,7 +202,7 @@ const sendNotification = (message: string) => {
   }
 };
 
-export default function Component() {
+export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [newHabit, setNewHabit] = useState("")
   const [isHealthy, setIsHealthy] = useState(false)
@@ -208,7 +214,7 @@ export default function Component() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>("all")
   const [remindersEnabled, setRemindersEnabled] = useState(false)
-  const [user, setUser] = useState<{ id: string } | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
@@ -245,14 +251,14 @@ export default function Component() {
 
     // Check user session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      setUser(session?.user as User | null)
       if (session?.user) {
         fetchHabits(session.user.id)
       }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      setUser(session?.user as User | null)
       if (session?.user) {
         fetchHabits(session.user.id)
       } else {
@@ -333,7 +339,7 @@ export default function Component() {
     }
     if (newHabit.trim() !== "") {
       const habit = { 
-        user_id: user.id,
+        user_id: user!.id,
         name: newHabit,
         days_count: 1, 
         is_healthy: isHealthy,
@@ -487,7 +493,7 @@ export default function Component() {
   const incrementAllDays = async () => {
     if (!user) return
 
-    const {  error } = await supabase.rpc('increment_all_habits', { user_id: user.id })
+    const { error } = await supabase.rpc('increment_all_habits', { user_id: user.id })
 
     if (error) {
       console.error('Error incrementing all habits:', error)
@@ -570,11 +576,22 @@ export default function Component() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
         <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-          <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">{t.title}</h1>
+          <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-white">{t.title}</h1>
           <Auth
             supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: 'rgb(59, 130, 246)',
+                    brandAccent: 'rgb(37, 99, 235)',
+                  },
+                },
+              },
+            }}
             theme={theme}
+            providers={['google']}
             localization={{
               variables: {
                 sign_up: {
@@ -733,10 +750,10 @@ export default function Component() {
         )}
         {filteredHabits.length > ITEMS_PER_PAGE && (
           <div className="flex justify-between mt-6">
-            <Button onClick={handlePreviousPage} disabled={currentPage === 1} className="w-24">
+            <Button onClick={handlePreviousPage} disabled={currentPage=== 1} className="w-24">
               {t.previous}
             </Button>
-            <Button onClick={handleNextPage} disabled={currentPage === totalPages} className="w-24">
+            <Button onClick={handleNextPage}disabled={currentPage === totalPages} className="w-24">
               {t.next}
             </Button>
           </div>
