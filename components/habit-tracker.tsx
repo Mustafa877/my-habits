@@ -22,6 +22,13 @@ import {
 } from "@/components/ui/alert-dialog"
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // Initialize Supabase client
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -43,6 +50,11 @@ interface Habit {
 type User = {
   id: string;
   email?: string;
+  user_metadata?: {
+    avatar_url?: string;
+    full_name?: string;
+    name?: string;
+  };
   // Add other relevant user properties here
 };
 
@@ -131,7 +143,7 @@ const translations = {
     signOut: "Sign Out",
     signInWithGoogle: "Sign in with Google",
     or: "or",
-    signInWithEmail: "Sign in with Email",
+    signInWithEmail: "Sign in with Email"
   },
   ar: {
     title: "متتبع العادات",
@@ -186,7 +198,7 @@ const translations = {
     signOut: "تسجيل الخروج",
     signInWithGoogle: "تسجيل الدخول باستخدام Google",
     or: "أو",
-    signInWithEmail: "تسجيل الدخول باستخدام البريد الإلكتروني",
+    signInWithEmail: "تسجيل الدخول باستخدام البريد الإلكتروني"
   },
 }
 
@@ -208,7 +220,7 @@ const sendNotification = (message: string) => {
   }
 };
 
-export default function Component() {
+export function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [newHabit, setNewHabit] = useState("")
   const [isHealthy, setIsHealthy] = useState(false)
@@ -221,9 +233,28 @@ export default function Component() {
   const [filter, setFilter] = useState<Filter>("all")
   const [remindersEnabled, setRemindersEnabled] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const { toasts } = useToasterStore()
 
   const t = translations[lang]
+
+  const fetchAvatarUrl = useCallback(async (userId: string) => {
+    if (user?.user_metadata?.avatar_url) {
+      setAvatarUrl(user.user_metadata.avatar_url);
+    } else {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching avatar URL:', error);
+      } else if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     const storedLang = localStorage.getItem("lang") as Language
@@ -260,6 +291,7 @@ export default function Component() {
       setUser(session?.user as User | null)
       if (session?.user) {
         fetchHabits(session.user.id)
+        fetchAvatarUrl(session.user.id)
       }
     })
 
@@ -267,13 +299,15 @@ export default function Component() {
       setUser(session?.user as User | null)
       if (session?.user) {
         fetchHabits(session.user.id)
+        fetchAvatarUrl(session.user.id)
       } else {
         setHabits([])
+        setAvatarUrl(null)
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [fetchAvatarUrl])
 
   useEffect(() => {
     localStorage.setItem("lang", lang)
@@ -614,15 +648,6 @@ export default function Component() {
               },
             }}
           />
-          {/* <div className="text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">{t.or}</p>
-            <Button
-              onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
-              className="mt-2 w-full"
-            >
-              {t.signInWithGoogle}
-            </Button>
-          </div> */}
         </div>
       </div>
     )
@@ -632,27 +657,80 @@ export default function Component() {
     <div className={`flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ${
       lang === "ar" ? "font-arabic" : ""
     }`}>
-      <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-md p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white transition-colors duration-300">
-            {t.title}
-          </h1>
-          <div className="flex space-x-2 rtl:space-x-reverse">
-            <Button onClick={toggleLanguage} variant="outline" size="icon" aria-label={t.toggleLanguage}>
-              <Languages className="h-5 w-5" />
+      <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-md p-2 sm:p-4">
+  <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
+    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white transition-colors duration-300 mb-2 sm:mb-0">
+      {t.title}
+    </h1>
+    <div className="flex items-center space-x-2 sm:space-x-4 rtl:space-x-reverse">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" className="p-1 sm:p-2">
+              <Avatar className="h-8 w-8 sm:h-9 sm:w-9">
+                <AvatarImage src={avatarUrl || undefined} alt="User avatar" />
+                <AvatarFallback>{user?.user_metadata?.full_name?.[0] || user?.email?.[0].toUpperCase()}</AvatarFallback>
+              </Avatar>
             </Button>
-            <Button onClick={toggleTheme} variant="outline" size="icon" aria-label={t.toggleTheme}>
-              {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            </Button>
-            <Button onClick={toggleReminders} variant="outline" size="icon" aria-label={remindersEnabled ? t.disableReminders : t.enableReminders}>
-              {remindersEnabled ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
-            </Button>
-            <Button onClick={signOut} variant="outline" size="icon" aria-label={t.signOut}>
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{user?.user_metadata?.full_name || user?.email || 'User'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <div className="flex space-x-1 sm:space-x-2 rtl:space-x-reverse">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={toggleLanguage} variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" aria-label={t.toggleLanguage}>
+                <Languages className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{t.toggleLanguage}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={toggleTheme} variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" aria-label={t.toggleTheme}>
+                {theme === "light" ? <Moon className="h-4 w-4 sm:h-5 sm:w-5" /> : <Sun className="h-4 w-4 sm:h-5 sm:w-5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{t.toggleTheme}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={toggleReminders} variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" aria-label={remindersEnabled ? t.disableReminders : t.enableReminders}>
+                {remindersEnabled ? <BellOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Bell className="h-4 w-4 sm:h-5 sm:w-5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{remindersEnabled ? t.disableReminders : t.enableReminders}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={signOut} variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" aria-label={t.signOut}>
+                <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{t.signOut}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
+  </div>
+</header>
       <main className="flex-grow p-4 md:p-6 container mx-auto max-w-4xl">
         <Toaster
           position="bottom-center"
@@ -754,7 +832,7 @@ export default function Component() {
                   </div>
                   <Progress 
                     value={(habit.days_count / 30) * 100} 
-                    className={`w-full ${habit.is_healthy ? 'bggreen-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
+                    className={`w-full ${habit.is_healthy ? 'bg-green-200 dark:bg-green-900' : 'bg-red-200 dark:bg-red-900'}`}
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                     {t.createdOn} {new Date(habit.creation_date).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}
